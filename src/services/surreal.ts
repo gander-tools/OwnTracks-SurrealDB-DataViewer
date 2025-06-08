@@ -1,8 +1,14 @@
 import { Surreal } from 'surrealdb'
+import { useCredentialsStore } from '../stores/credentials'
 
 export interface OwnTracksData {
   id?: string
   [key: string]: any
+}
+
+interface ConnectOptions {
+  username?: string;
+  password?: string;
 }
 
 class SurrealDBService {
@@ -13,7 +19,7 @@ class SurrealDBService {
     this.db = new Surreal()
   }
 
-  async connect(): Promise<void> {
+  async connect(options?: ConnectOptions): Promise<void> {
     try {
       const url = import.meta.env.VITE_SURREALDB_URL
       await this.db.connect(url)
@@ -23,8 +29,26 @@ class SurrealDBService {
 
       await this.db.use({ namespace, database })
 
-      const username = import.meta.env.VITE_SURREALDB_USERNAME
-      const password = import.meta.env.VITE_SURREALDB_PASSWORD
+      // Get credentials from store if not provided in options
+      let username: string;
+      let password: string;
+
+      if (options?.username && options?.password) {
+        // Use provided credentials
+        username = options.username;
+        password = options.password;
+      } else {
+        // Try to get credentials from store
+        const credentialsStore = useCredentialsStore();
+
+        if (!credentialsStore.isLoaded) {
+          throw new Error('No credentials available. Please set up your credentials first.');
+        }
+
+        username = credentialsStore.credentials.username;
+        password = credentialsStore.credentials.password;
+      }
+
       await this.db.signin({ username, password, namespace, database })
 
       this.connected = true

@@ -1,89 +1,112 @@
 <template>
   <div class="owntracks-data">
-    <div class="controls">
-      <button
-        @click="handleConnect"
-        :disabled="state.loading || state.connected"
-        class="btn btn-primary"
-      >
-        {{ state.connected ? 'Connected' : 'Connect to SurrealDB' }}
-      </button>
+    <!-- Credentials Form -->
+    <CredentialsForm
+      v-if="showCredentialsForm"
+      @success="handleCredentialsSuccess"
+      class="credentials-section"
+    />
 
-      <button
-        @click="handleDisconnect"
-        :disabled="!state.connected"
-        class="btn btn-secondary"
-      >
-        Disconnect
-      </button>
-
-      <button
-        @click="handleFetchWithFilters"
-        :disabled="!state.connected || state.loading"
-        class="btn btn-success"
-      >
-        Fetch Data
-      </button>
-
-      <button
-        @click="clearData"
-        :disabled="state.data.length === 0"
-        class="btn btn-warning"
-      >
-        Clear Data
-      </button>
-    </div>
-
-    <div class="filters" v-if="state.connected">
-      <div class="filter-group">
-        <label for="deviceId">Filter by Device ID:</label>
-        <input
-          id="deviceId"
-          v-model="deviceId"
-          type="text"
-          placeholder="Enter device ID (optional)"
-          class="input"
-        />
-      </div>
-
-      <div class="filter-group">
-        <label for="startDate">Date Range:</label>
-        <input
-          id="startDate"
-          v-model="startDate"
-          type="date"
-          class="input"
-        />
-        <input
-          v-model="endDate"
-          type="date"
-          class="input"
-        />
-      </div>
-
-      <div class="filter-group">
-        <label for="decryptionPassword">Decryption Password:</label>
-        <input
-          id="decryptionPassword"
-          v-model="decryptionPassword"
-          type="password"
-          placeholder="Enter password to decrypt data (optional)"
-          class="input"
-        />
-        <button
-          @click="handleDecryptData"
-          :disabled="!decryptionPassword || state.data.length === 0 || isDecrypting"
-          class="btn btn-info"
-        >
-          {{ isDecrypting ? 'Decrypting...' : 'Decrypt Data' }}
+    <div v-else>
+      <div class="credentials-status" v-if="credentialsStore.isLoaded">
+        <div class="status-badge success">
+          <span>Credentials Loaded</span>
+        </div>
+        <button @click="showCredentialsForm = true" class="btn btn-secondary btn-sm">
+          Manage Credentials
         </button>
+      </div>
+
+      <div class="controls">
         <button
-          @click="clearDecryption"
-          :disabled="decryptionResults.size === 0"
+          @click="handleConnect"
+          :disabled="state.loading || state.connected || !credentialsStore.isLoaded"
+          class="btn btn-primary"
+        >
+          {{ state.connected ? 'Connected' : 'Connect to SurrealDB' }}
+        </button>
+
+        <button
+          @click="handleDisconnect"
+          :disabled="!state.connected"
           class="btn btn-secondary"
         >
-          Clear Decryption
+          Disconnect
         </button>
+
+        <button
+          @click="handleFetchWithFilters"
+          :disabled="!state.connected || state.loading"
+          class="btn btn-success"
+        >
+          Fetch Data
+        </button>
+
+        <button
+          @click="clearData"
+          :disabled="state.data.length === 0"
+          class="btn btn-warning"
+        >
+          Clear Data
+        </button>
+      </div>
+
+      <div class="filters" v-if="state.connected">
+        <div class="filter-group">
+          <label for="deviceId">Filter by Device ID:</label>
+          <input
+            id="deviceId"
+            v-model="deviceId"
+            type="text"
+            placeholder="Enter device ID (optional)"
+            class="input"
+          />
+        </div>
+
+        <div class="filter-group">
+          <label for="startDate">Date Range:</label>
+          <input
+            id="startDate"
+            v-model="startDate"
+            type="date"
+            class="input"
+          />
+          <input
+            v-model="endDate"
+            type="date"
+            class="input"
+          />
+        </div>
+
+        <div class="filter-group">
+          <div class="decryption-info" v-if="credentialsStore.isLoaded && credentialsStore.credentials.decryptionPassword">
+            <span>Using stored decryption password</span>
+          </div>
+          <div v-else>
+            <label for="decryptionPassword">Decryption Password:</label>
+            <input
+              id="decryptionPassword"
+              v-model="decryptionPassword"
+              type="password"
+              placeholder="Enter password to decrypt data (optional)"
+              class="input"
+            />
+          </div>
+          <button
+            @click="handleDecryptData"
+            :disabled="(!hasDecryptionPassword || state.data.length === 0 || isDecrypting)"
+            class="btn btn-info"
+          >
+            {{ isDecrypting ? 'Decrypting...' : 'Decrypt Data' }}
+          </button>
+          <button
+            @click="clearDecryption"
+            :disabled="decryptionResults.size === 0"
+            class="btn btn-secondary"
+          >
+            Clear Decryption
+          </button>
+        </div>
       </div>
     </div>
 
@@ -143,22 +166,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, reactive } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useOwnTracks } from '../composables/useOwnTracks'
 import type { OwnTracksData } from '../services/surreal'
 import ownTracksCrypto from '../services/crypto'
+import { useCredentialsStore } from '../stores/credentials'
+import CredentialsForm from './CredentialsForm.vue'
 
 const { state, connect, disconnect, fetchEncryptedData, fetchEncryptedDataByDevice, fetchEncryptedDataByDateRange, fetchEncryptedDataWithFilters, clearData } = useOwnTracks()
+const credentialsStore = useCredentialsStore()
 
 const deviceId = ref('')
 const startDate = ref('')
 const endDate = ref('')
 const decryptionPassword = ref('')
 const isDecrypting = ref(false)
+const showCredentialsForm = ref(!credentialsStore.hasStoredCredentials() || !credentialsStore.isLoaded)
 
 const decryptionResults = reactive<Map<string, { success: boolean; data?: string; error?: string }>>(new Map())
 
+// Check if we have a decryption password (either stored or manually entered)
+const hasDecryptionPassword = computed(() => {
+  return !!(decryptionPassword.value || (credentialsStore.isLoaded && credentialsStore.credentials.decryptionPassword))
+})
+
+const handleCredentialsSuccess = () => {
+  showCredentialsForm.value = false
+}
+
 const handleConnect = async () => {
+  if (!credentialsStore.isLoaded) {
+    showCredentialsForm.value = true
+    return
+  }
   await connect()
 }
 
@@ -248,9 +288,16 @@ const getMetadata = (item: OwnTracksData): [string, any][] => {
 // Decryption functions
 const tryDecryptItem = async (item: OwnTracksData) => {
   const contentValue = getContentValue(item)
-  if (!decryptionPassword.value || !contentValue || !item.id) return
+  if (!contentValue || !item.id) return
 
-  const result = await ownTracksCrypto.decryptOwnTracksData(contentValue, decryptionPassword.value)
+  // Get decryption password from store or input field
+  const password = credentialsStore.isLoaded && credentialsStore.credentials.decryptionPassword
+    ? credentialsStore.credentials.decryptionPassword
+    : decryptionPassword.value
+
+  if (!password) return
+
+  const result = await ownTracksCrypto.decryptOwnTracksData(contentValue, password)
 
   if (result.success && result.data) {
     decryptionResults.set(item.id, {
@@ -285,7 +332,8 @@ const getDecryptionError = (item: OwnTracksData): string => {
 
 // Manual decryption handlers
 const handleDecryptData = async () => {
-  if (!decryptionPassword.value || state.data.length === 0) return
+  // Check if we have a decryption password (either stored or manually entered)
+  if (!hasDecryptionPassword.value || state.data.length === 0) return
 
   isDecrypting.value = true
 
@@ -536,5 +584,46 @@ const clearDecryption = () => {
 .filter-group label {
   display: block;
   margin-bottom: 5px;
+}
+
+.credentials-section {
+  margin-bottom: 30px;
+}
+
+.credentials-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-bottom: 20px;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+}
+
+.status-badge {
+  padding: 5px 10px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.status-badge.success {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.btn-sm {
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.decryption-info {
+  background-color: #d1ecf1;
+  color: #0c5460;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 14px;
 }
 </style>

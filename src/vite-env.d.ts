@@ -7,8 +7,6 @@ declare module 'libsodium-wrappers' {
 
 interface ImportMetaEnv {
   readonly VITE_SURREALDB_URL: string
-  readonly VITE_SURREALDB_USERNAME: string
-  readonly VITE_SURREALDB_PASSWORD: string
   readonly VITE_SURREALDB_NAMESPACE: string
   readonly VITE_SURREALDB_DATABASE: string
   readonly VITE_SURREALDB_TABLE: string
