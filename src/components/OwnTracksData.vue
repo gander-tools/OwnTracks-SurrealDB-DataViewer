@@ -48,19 +48,19 @@
       Error: {{ state.error }}
     </div>
 
-    <div v-if="state.data.length > 0" class="data-section">
-      <!-- Map section -->
-      <div v-if="mapData.length > 0" class="map-section">
-        <h3>OwnTracks Location Map ({{ mapData.length }} points)</h3>
+    <div class="data-section">
+      <!-- Map section - always show the map -->
+      <div class="map-section">
+        <h3>OwnTracks Location Map {{ mapData.length > 0 ? `(${mapData.length} points)` : '' }}</h3>
         <OwnTracksMap :decrypted-data="mapData" />
       </div>
 
-      <div v-else class="no-map-data">
+      <div v-if="state.data.length > 0 && mapData.length === 0" class="no-map-data">
         <p>No location data available for map display. Data will be automatically decrypted and displayed as it becomes available.</p>
       </div>
     </div>
 
-    <div v-else-if="state.connected && !state.loading" class="no-data">
+    <div v-if="state.connected && !state.loading && state.data.length === 0" class="no-data">
       No encrypted OwnTracks data found. You can use the filters and click "Fetch Data" to load data with specific criteria.
     </div>
   </div>

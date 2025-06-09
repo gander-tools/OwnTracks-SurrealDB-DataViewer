@@ -16,6 +16,26 @@ import 'leaflet/dist/leaflet.css';
 import icon from 'leaflet/dist/images/marker-icon.png';
 import iconShadow from 'leaflet/dist/images/marker-shadow.png';
 
+// Function to calculate bearing between two points
+const calculateBearing = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
+  // Convert to radians
+  const startLat = lat1 * Math.PI / 180;
+  const startLng = lon1 * Math.PI / 180;
+  const destLat = lat2 * Math.PI / 180;
+  const destLng = lon2 * Math.PI / 180;
+
+  // Calculate bearing
+  const y = Math.sin(destLng - startLng) * Math.cos(destLat);
+  const x = Math.cos(startLat) * Math.sin(destLat) -
+            Math.sin(startLat) * Math.cos(destLat) * Math.cos(destLng - startLng);
+  let bearing = Math.atan2(y, x) * 180 / Math.PI;
+
+  // Normalize to 0-360
+  bearing = (bearing + 360) % 360;
+
+  return bearing;
+};
+
 // Fix default icon
 let DefaultIcon = L.icon({
   iconUrl: icon,
@@ -39,6 +59,14 @@ const markerLayers = ref<Record<string, L.LayerGroup>>({});
 
 // Compute whether we have data to display
 const hasData = computed(() => props.decryptedData.length > 0);
+
+// Watch for data changes to reset view when data is cleared
+watch(() => hasData.value, (newHasData) => {
+  if (!newHasData && map.value) {
+    // Reset to world view when data is cleared
+    map.value.setView([0, 0], 2);
+  }
+});
 
 // Colors for different devices
 const deviceColors = [
@@ -92,6 +120,9 @@ const drawPaths = () => {
   // Clear existing paths and markers
   clearMap();
 
+  // Make sure the map is showing the world view first
+  map.value.setView([0, 0], 2);
+
   // Group data by device
   const deviceData: Record<string, any[]> = {};
 
@@ -141,11 +172,42 @@ const drawPaths = () => {
     markerLayers.value[deviceId] = markerGroup;
 
     points.forEach((point, i) => {
-      const marker = L.circleMarker([point.lat, point.lon] as L.LatLngExpression, {
-        radius: 5,
-        color,
-        fillColor: color,
-        fillOpacity: 0.7,
+      // Calculate bearing based on previous and next points
+      let bearing = 0;
+
+      if (i < points.length - 1) {
+        // If not the last point, use direction to next point
+        bearing = calculateBearing(
+          point.lat,
+          point.lon,
+          points[i + 1].lat,
+          points[i + 1].lon
+        );
+      } else if (i > 0) {
+        // If last point, use direction from previous point
+        bearing = calculateBearing(
+          points[i - 1].lat,
+          points[i - 1].lon,
+          point.lat,
+          point.lon
+        );
+      }
+
+      // Create an SVG arrow icon
+      const arrowIcon = L.divIcon({
+        html: `
+          <svg width="16" height="16" viewBox="0 0 16 16" style="transform: rotate(${bearing}deg);">
+            <polygon points="8,0 16,16 8,12 0,16" fill="${color}" stroke="black" stroke-width="1" />
+          </svg>
+        `,
+        className: 'arrow-marker',
+        iconSize: [16, 16],
+        iconAnchor: [8, 8]
+      });
+
+      // Create marker with arrow icon
+      const marker = L.marker([point.lat, point.lon] as L.LatLngExpression, {
+        icon: arrowIcon
       });
 
       // Add popup with information
@@ -160,18 +222,21 @@ const drawPaths = () => {
         ${point.alt ? `<strong>Alt:</strong> ${point.alt}m<br>` : ''}
         ${point.vel ? `<strong>Velocity:</strong> ${point.vel}km/h<br>` : ''}
         ${point.acc ? `<strong>Accuracy:</strong> ${point.acc}m<br>` : ''}
+        ${bearing ? `<strong>Direction:</strong> ${Math.round(bearing)}°<br>` : ''}
       `);
 
       marker.addTo(markerGroup);
     });
+  });
 
-    // Fit map to show all paths if we have data
-    if (Object.keys(pathLayers.value).length > 0) {
+  // Fit map to show all paths after a short delay to ensure the world view is seen first
+  if (Object.keys(pathLayers.value).length > 0) {
+    setTimeout(() => {
       const allPolylines = Object.values(pathLayers.value);
       const bounds = L.featureGroup(allPolylines).getBounds();
       map.value!.fitBounds(bounds, { padding: [30, 30] });
-    }
-  });
+    }, 1000); // 1 second delay
+  }
 };
 
 // Initialize map on component mount
@@ -214,5 +279,14 @@ watch(() => props.decryptedData, () => {
   z-index: 1000;
   font-style: italic;
   color: #666;
+}
+
+.arrow-marker {
+  background: none;
+  border: none;
+}
+
+.arrow-marker svg {
+  filter: drop-shadow(0px 1px 2px rgba(0,0,0,0.5));
 }
 </style>
