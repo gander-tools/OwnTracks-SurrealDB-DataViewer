@@ -19,27 +19,11 @@
 
       <div class="controls">
         <button
-          @click="handleConnect"
-          :disabled="state.loading || state.connected || !credentialsStore.isLoaded"
-          class="btn btn-primary"
-        >
-          {{ state.connected ? 'Connected' : 'Connect to SurrealDB' }}
-        </button>
-
-        <button
           @click="handleDisconnect"
           :disabled="!state.connected"
           class="btn btn-secondary"
         >
           Disconnect
-        </button>
-
-        <button
-          @click="handleFetchWithFilters"
-          :disabled="!state.connected || state.loading"
-          class="btn btn-success"
-        >
-          Fetch Data
         </button>
 
         <button
@@ -51,58 +35,8 @@
         </button>
       </div>
 
-      <div class="filters" v-if="state.connected">
-        <div class="filter-group">
-          <label for="deviceId">Filter by Device ID:</label>
-          <input
-            id="deviceId"
-            v-model="deviceId"
-            type="text"
-            placeholder="Enter device ID (optional)"
-            class="input"
-          />
-        </div>
-
-        <div class="filter-group">
-          <label for="startDate">Date Range:</label>
-          <input
-            id="startDate"
-            v-model="startDate"
-            type="date"
-            class="input"
-          />
-          <input
-            v-model="endDate"
-            type="date"
-            class="input"
-          />
-        </div>
-
-        <div class="filter-group">
-          <div class="decryption-info" v-if="credentialsStore.isLoaded && credentialsStore.credentials.decryptionPassword">
-            <span>Using stored decryption password</span>
-          </div>
-          <div v-else>
-            <label for="decryptionPassword">Decryption Password:</label>
-            <input
-              id="decryptionPassword"
-              v-model="decryptionPassword"
-              type="password"
-              placeholder="Enter password to decrypt data (optional)"
-              class="input"
-            />
-          </div>
-          <div class="decryption-status" v-if="isDecrypting">
-            <span>Decrypting data automatically...</span>
-          </div>
-          <button
-            @click="clearDecryption"
-            :disabled="decryptionResults.size === 0"
-            class="btn btn-secondary"
-          >
-            Clear Decryption
-          </button>
-        </div>
+      <div class="decryption-status" v-if="isDecrypting">
+        <span>Decrypting data automatically...</span>
       </div>
     </div>
 
@@ -141,75 +75,20 @@ import { useCredentialsStore } from '../stores/credentials'
 import CredentialsForm from './CredentialsForm.vue'
 import OwnTracksMap from './OwnTracksMap.vue'
 
-const { state, connect, disconnect, fetchEncryptedData, fetchEncryptedDataByDevice, fetchEncryptedDataByDateRange, fetchEncryptedDataWithFilters, clearData } = useOwnTracks()
+const { state, connect, disconnect, fetchEncryptedData, clearData } = useOwnTracks()
 const credentialsStore = useCredentialsStore()
 
-const deviceId = ref('')
-const startDate = ref('')
-const endDate = ref('')
-const decryptionPassword = ref('')
 const isDecrypting = ref(false)
 const showCredentialsForm = ref(!credentialsStore.hasStoredCredentials() || !credentialsStore.isLoaded)
 
 const decryptionResults = reactive<Map<string, { success: boolean; data?: string; error?: string }>>(new Map())
 
-// Check if we have a decryption password (either stored or manually entered)
-const hasDecryptionPassword = computed(() => {
-  return !!(decryptionPassword.value || (credentialsStore.isLoaded && credentialsStore.credentials.decryptionPassword))
-})
-
 const handleCredentialsSuccess = () => {
   showCredentialsForm.value = false
 }
 
-const handleConnect = async () => {
-  if (!credentialsStore.isLoaded) {
-    showCredentialsForm.value = true
-    return
-  }
-  await connect()
-}
-
 const handleDisconnect = async () => {
   await disconnect()
-}
-
-const handleFetchWithFilters = async () => {
-  const device = deviceId.value.trim() || undefined
-  let start: Date | undefined
-  let end: Date | undefined
-
-  if (startDate.value && endDate.value) {
-    start = new Date(startDate.value)
-    start.setHours(0, 0, 0, 0)
-
-    end = new Date(endDate.value)
-    end.setHours(23, 59, 59, 999)
-  }
-
-  await fetchEncryptedDataWithFilters(device, start, end)
-}
-
-const handleFetchData = async () => {
-  await fetchEncryptedData()
-}
-
-const handleFetchByDevice = async () => {
-  if (deviceId.value) {
-    await fetchEncryptedDataByDevice(deviceId.value)
-  }
-}
-
-const handleFetchByDateRange = async () => {
-  if (startDate.value && endDate.value) {
-    const start = new Date(startDate.value)
-    start.setHours(0, 0, 0, 0)
-
-    const end = new Date(endDate.value)
-    end.setHours(23, 59, 59, 999)
-
-    await fetchEncryptedDataByDateRange(start, end)
-  }
 }
 
 const formatTimestamp = (timestamp: string | undefined): string => {
@@ -258,12 +137,10 @@ const tryDecryptItem = async (item: OwnTracksData) => {
   const contentValue = getContentValue(item)
   if (!contentValue || !item.id) return
 
-  // Get decryption password from store or input field
-  const password = credentialsStore.isLoaded && credentialsStore.credentials.decryptionPassword
-    ? credentialsStore.credentials.decryptionPassword
-    : decryptionPassword.value
+  // Get decryption password from store
+  if (!credentialsStore.isLoaded || !credentialsStore.credentials.decryptionPassword) return
 
-  if (!password) return
+  const password = credentialsStore.credentials.decryptionPassword
 
   const result = await ownTracksCrypto.decryptOwnTracksData(contentValue, password)
 
@@ -298,34 +175,12 @@ const getDecryptionError = (item: OwnTracksData): string => {
   return result?.error || ''
 }
 
-// Manual decryption handlers
-const handleDecryptData = async () => {
-  // Check if we have a decryption password (either stored or manually entered)
-  if (!hasDecryptionPassword.value || state.data.length === 0) return
 
-  isDecrypting.value = true
-
-  try {
-    // Clear previous results
-    decryptionResults.clear()
-
-    // Try to decrypt all items
-    for (const item of state.data) {
-      await tryDecryptItem(item)
-    }
-  } finally {
-    isDecrypting.value = false
-  }
-}
-
-const clearDecryption = () => {
-  decryptionResults.clear()
-}
 
 // Incremental decryption function
 const startIncrementalDecryption = async () => {
-  // Check if we have a decryption password (either stored or manually entered)
-  if (!hasDecryptionPassword.value || state.data.length === 0) return
+  // Check if we have a decryption password
+  if (!credentialsStore.isLoaded || !credentialsStore.credentials.decryptionPassword || state.data.length === 0) return
 
   isDecrypting.value = true
 
@@ -371,6 +226,18 @@ watch(() => state.data, (newData) => {
   }
 }, { immediate: false })
 
+// Watch for credentials being loaded to automatically connect and fetch data
+watch(() => credentialsStore.isLoaded, (isLoaded) => {
+  if (isLoaded && !state.connected) {
+    connect().then(() => {
+      // Data is automatically fetched in the connect function
+      console.log('Connected and fetched data automatically after credentials loaded')
+    }).catch(error => {
+      console.error('Error connecting after credentials loaded:', error)
+    })
+  }
+}, { immediate: true })
+
 // Transform decrypted data for the map component
 const mapData = computed(() => {
   const result: Record<string, any>[] = [];
@@ -397,7 +264,9 @@ const mapData = computed(() => {
     }
   });
 
-  return result;
+  // Reverse the order of the data to display in ASC order (oldest first)
+  // Data is retrieved from SurrealDB in DESC order (newest first)
+  return result.reverse();
 });
 </script>
 

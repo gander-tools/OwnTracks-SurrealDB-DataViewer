@@ -80,8 +80,11 @@ class SurrealDBService {
       const encryptedField = import.meta.env.VITE_SURREALDB_ENCRYPTED_FIELD
       const timestampField = import.meta.env.VITE_SURREALDB_TIMESTAMP_FIELD
 
-      const query = `SELECT * FROM ${tableName} WHERE ${encryptedField} IS NOT NULL ORDER BY ${timestampField} DESC LIMIT 1000`
-      const result = await this.db.query(query)
+      const timeAgo = new Date();
+      timeAgo.setMinutes(timeAgo.getMinutes() - 120);
+
+      const query = `SELECT * FROM ${tableName} WHERE ${encryptedField} IS NOT NULL AND ${timestampField} >= <datetime>$fifteenMinutesAgo ORDER BY ${timestampField} DESC`
+      const result = await this.db.query(query, { fifteenMinutesAgo: timeAgo.toISOString() })
 
       return result[0] as OwnTracksData[] || []
     } catch (error) {
