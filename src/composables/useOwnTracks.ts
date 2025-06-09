@@ -19,10 +19,13 @@ export function useOwnTracks() {
   const connect = async (): Promise<void> => {
     state.loading = true
     state.error = null
-    
+
     try {
       await surrealService.connect()
       state.connected = true
+
+      // Automatically fetch data after connecting
+      await fetchEncryptedData()
     } catch (error) {
       state.error = error instanceof Error ? error.message : 'Failed to connect to SurrealDB'
       state.connected = false
@@ -44,7 +47,7 @@ export function useOwnTracks() {
   const fetchEncryptedData = async (): Promise<void> => {
     state.loading = true
     state.error = null
-    
+
     try {
       const data = await surrealService.queryEncryptedOwnTracksData()
       state.data = data
@@ -59,7 +62,7 @@ export function useOwnTracks() {
   const fetchEncryptedDataByDevice = async (deviceId: string): Promise<void> => {
     state.loading = true
     state.error = null
-    
+
     try {
       const data = await surrealService.queryEncryptedOwnTracksDataByDevice(deviceId)
       state.data = data
@@ -74,7 +77,7 @@ export function useOwnTracks() {
   const fetchEncryptedDataByDateRange = async (startDate: Date, endDate: Date): Promise<void> => {
     state.loading = true
     state.error = null
-    
+
     try {
       const data = await surrealService.queryEncryptedOwnTracksDataByDateRange(startDate, endDate)
       state.data = data
@@ -89,7 +92,7 @@ export function useOwnTracks() {
   const fetchEncryptedDataWithFilters = async (deviceId?: string, startDate?: Date, endDate?: Date): Promise<void> => {
     state.loading = true
     state.error = null
-    
+
     try {
       const data = await surrealService.queryEncryptedOwnTracksDataWithFilters(deviceId, startDate, endDate)
       state.data = data

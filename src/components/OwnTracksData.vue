@@ -92,13 +92,9 @@
               class="input"
             />
           </div>
-          <button
-            @click="handleDecryptData"
-            :disabled="(!hasDecryptionPassword || state.data.length === 0 || isDecrypting)"
-            class="btn btn-info"
-          >
-            {{ isDecrypting ? 'Decrypting...' : 'Decrypt Data' }}
-          </button>
+          <div class="decryption-status" v-if="isDecrypting">
+            <span>Decrypting data automatically...</span>
+          </div>
           <button
             @click="clearDecryption"
             :disabled="decryptionResults.size === 0"
@@ -126,18 +122,18 @@
       </div>
 
       <div v-else class="no-map-data">
-        <p>No location data available for map display. Please decrypt the data first.</p>
+        <p>No location data available for map display. Data will be automatically decrypted and displayed as it becomes available.</p>
       </div>
     </div>
 
     <div v-else-if="state.connected && !state.loading" class="no-data">
-      No encrypted OwnTracks data found. Click "Fetch Data" to load data with optional filters.
+      No encrypted OwnTracks data found. You can use the filters and click "Fetch Data" to load data with specific criteria.
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useOwnTracks } from '../composables/useOwnTracks'
 import type { OwnTracksData } from '../services/surreal'
 import ownTracksCrypto from '../services/crypto'
@@ -325,6 +321,55 @@ const handleDecryptData = async () => {
 const clearDecryption = () => {
   decryptionResults.clear()
 }
+
+// Incremental decryption function
+const startIncrementalDecryption = async () => {
+  // Check if we have a decryption password (either stored or manually entered)
+  if (!hasDecryptionPassword.value || state.data.length === 0) return
+
+  isDecrypting.value = true
+
+  try {
+    // Clear previous results
+    decryptionResults.clear()
+
+    // Process items in batches to avoid blocking the UI
+    const batchSize = 5
+    let currentIndex = 0
+
+    const processNextBatch = async () => {
+      if (currentIndex >= state.data.length) {
+        isDecrypting.value = false
+        return
+      }
+
+      const endIndex = Math.min(currentIndex + batchSize, state.data.length)
+
+      // Process a batch of items
+      for (let i = currentIndex; i < endIndex; i++) {
+        await tryDecryptItem(state.data[i])
+      }
+
+      currentIndex = endIndex
+
+      // Schedule the next batch with a small delay to allow UI updates
+      setTimeout(processNextBatch, 10)
+    }
+
+    // Start processing
+    processNextBatch()
+  } catch (error) {
+    console.error('Error during incremental decryption:', error)
+    isDecrypting.value = false
+  }
+}
+
+// Watch for changes in state.data to start decryption automatically
+watch(() => state.data, (newData) => {
+  if (newData.length > 0) {
+    startIncrementalDecryption()
+  }
+}, { immediate: false })
 
 // Transform decrypted data for the map component
 const mapData = computed(() => {
@@ -626,6 +671,16 @@ const mapData = computed(() => {
   border-radius: 4px;
   margin-bottom: 10px;
   font-size: 14px;
+}
+
+.decryption-status {
+  background-color: #d4edda;
+  color: #155724;
+  padding: 8px 12px;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  font-size: 14px;
+  display: inline-block;
 }
 
 .map-section {
