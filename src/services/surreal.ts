@@ -81,7 +81,7 @@ class SurrealDBService {
       const timestampField = import.meta.env.VITE_SURREALDB_TIMESTAMP_FIELD
 
       const timeAgo = new Date();
-      timeAgo.setMinutes(timeAgo.getMinutes() - 120);
+      timeAgo.setMinutes(timeAgo.getMinutes() - 30);
 
       const query = `SELECT * FROM ${tableName} WHERE ${encryptedField} IS NOT NULL AND ${timestampField} >= <datetime>$fifteenMinutesAgo ORDER BY ${timestampField} DESC`
       const result = await this.db.query(query, { fifteenMinutesAgo: timeAgo.toISOString() })

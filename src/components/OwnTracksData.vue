@@ -17,23 +17,6 @@
         </button>
       </div>
 
-      <div class="controls">
-        <button
-          @click="handleDisconnect"
-          :disabled="!state.connected"
-          class="btn btn-secondary"
-        >
-          Disconnect
-        </button>
-
-        <button
-          @click="clearData"
-          :disabled="state.data.length === 0"
-          class="btn btn-warning"
-        >
-          Clear Data
-        </button>
-      </div>
 
       <div class="decryption-status" v-if="isDecrypting">
         <span>Decrypting data automatically...</span>
@@ -75,7 +58,7 @@ import { useCredentialsStore } from '../stores/credentials'
 import CredentialsForm from './CredentialsForm.vue'
 import OwnTracksMap from './OwnTracksMap.vue'
 
-const { state, connect, disconnect, fetchEncryptedData, clearData } = useOwnTracks()
+const { state, connect, fetchEncryptedData } = useOwnTracks()
 const credentialsStore = useCredentialsStore()
 
 const isDecrypting = ref(false)
@@ -87,9 +70,6 @@ const handleCredentialsSuccess = () => {
   showCredentialsForm.value = false
 }
 
-const handleDisconnect = async () => {
-  await disconnect()
-}
 
 const formatTimestamp = (timestamp: string | undefined): string => {
   if (!timestamp) return 'N/A'
@@ -277,13 +257,6 @@ const mapData = computed(() => {
   padding: 20px;
 }
 
-.controls {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-  flex-wrap: wrap;
-  justify-content: center;
-}
 
 .filters {
   background: #f5f5f5;
