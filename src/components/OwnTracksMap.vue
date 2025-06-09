@@ -56,6 +56,7 @@ const mapRef = ref<HTMLElement | null>(null);
 const map = ref<L.Map | null>(null);
 const pathLayers = ref<Record<string, L.Polyline>>({});
 const markerLayers = ref<Record<string, L.LayerGroup>>({});
+const initialBoundsSet = ref<boolean>(false);
 
 // Compute whether we have data to display
 const hasData = computed(() => props.decryptedData.length > 0);
@@ -65,6 +66,8 @@ watch(() => hasData.value, (newHasData) => {
   if (!newHasData && map.value) {
     // Reset to world view when data is cleared
     map.value.setView([0, 0], 2);
+    // Reset initialBoundsSet so that the next time data is added, the map will fit to it
+    initialBoundsSet.value = false;
   }
 });
 
@@ -111,17 +114,20 @@ const clearMap = () => {
     layer.remove();
   });
   markerLayers.value = {};
+
+  // Reset initialBoundsSet so that the next time data is added, the map will fit to it
+  initialBoundsSet.value = false;
 };
 
 // Draw paths on the map based on decrypted data
 const drawPaths = () => {
   if (!map.value || !hasData.value) return;
 
-  // Clear existing paths and markers
-  clearMap();
-
-  // Make sure the map is showing the world view first
-  map.value.setView([0, 0], 2);
+  // Initialize the map if it's empty
+  if (Object.keys(pathLayers.value).length === 0 && Object.keys(markerLayers.value).length === 0) {
+    // Only set world view when initializing the map for the first time
+    map.value.setView([0, 0], 2);
+  }
 
   // Group data by device
   const deviceData: Record<string, any[]> = {};
@@ -146,7 +152,7 @@ const drawPaths = () => {
     });
   });
 
-  // Draw paths for each device
+  // Update paths for each device
   Object.keys(deviceData).forEach((deviceId, index) => {
     const points = deviceData[deviceId];
     if (points.length < 1) return;
@@ -157,20 +163,31 @@ const drawPaths = () => {
     // Create path coordinates
     const coordinates = points.map(point => [point.lat, point.lon]);
 
-    // Create polyline
-    const polyline = L.polyline(coordinates as L.LatLngExpression[], {
-      color,
-      weight: 3,
-      opacity: 0.7,
-    }).addTo(map.value!);
+    // Update or create polyline
+    if (pathLayers.value[deviceId]) {
+      // Update existing polyline with new coordinates
+      pathLayers.value[deviceId].setLatLngs(coordinates as L.LatLngExpression[]);
+    } else {
+      // Create new polyline
+      const polyline = L.polyline(coordinates as L.LatLngExpression[], {
+        color,
+        weight: 3,
+        opacity: 0.7,
+      }).addTo(map.value!);
 
-    // Store the path layer
-    pathLayers.value[deviceId] = polyline;
+      // Store the path layer
+      pathLayers.value[deviceId] = polyline;
+    }
+
+    // Update or create marker group
+    if (!markerLayers.value[deviceId]) {
+      markerLayers.value[deviceId] = L.layerGroup().addTo(map.value!);
+    }
+
+    // Clear existing markers for this device
+    markerLayers.value[deviceId].clearLayers();
 
     // Create markers for each point
-    const markerGroup = L.layerGroup().addTo(map.value!);
-    markerLayers.value[deviceId] = markerGroup;
-
     points.forEach((point, i) => {
       // Calculate bearing based on previous and next points
       let bearing = 0;
@@ -225,17 +242,36 @@ const drawPaths = () => {
         ${bearing ? `<strong>Direction:</strong> ${Math.round(bearing)}°<br>` : ''}
       `);
 
-      marker.addTo(markerGroup);
+      marker.addTo(markerLayers.value[deviceId]);
     });
   });
 
-  // Fit map to show all paths after a short delay to ensure the world view is seen first
+  // Remove any device layers that are no longer in the data
+  const currentDeviceIds = Object.keys(deviceData);
+  Object.keys(pathLayers.value).forEach(deviceId => {
+    if (!currentDeviceIds.includes(deviceId)) {
+      // Remove path layer
+      pathLayers.value[deviceId].remove();
+      delete pathLayers.value[deviceId];
+
+      // Remove marker layer
+      if (markerLayers.value[deviceId]) {
+        markerLayers.value[deviceId].remove();
+        delete markerLayers.value[deviceId];
+      }
+    }
+  });
+
+  // Fit map to show all paths, but only if this is the first time or we have new devices
   if (Object.keys(pathLayers.value).length > 0) {
-    setTimeout(() => {
-      const allPolylines = Object.values(pathLayers.value);
-      const bounds = L.featureGroup(allPolylines).getBounds();
+    const allPolylines = Object.values(pathLayers.value);
+    const bounds = L.featureGroup(allPolylines).getBounds();
+
+    // Only adjust bounds if we have a significant change or it's the first time
+    if (initialBoundsSet.value === false) {
       map.value!.fitBounds(bounds, { padding: [30, 30] });
-    }, 1000); // 1 second delay
+      initialBoundsSet.value = true;
+    }
   }
 };
 
