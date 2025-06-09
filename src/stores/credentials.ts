@@ -6,6 +6,10 @@ interface Credentials {
   username: string
   password: string
   decryptionPassword: string
+  surrealUrl: string
+  surrealNamespace: string
+  surrealDatabase: string
+  surrealTable: string
 }
 
 // Function to encrypt data using libsodium
@@ -67,7 +71,11 @@ export const useCredentialsStore = defineStore('credentials', {
     credentials: {
       username: '',
       password: '',
-      decryptionPassword: ''
+      decryptionPassword: '',
+      surrealUrl: '',
+      surrealNamespace: '',
+      surrealDatabase: '',
+      surrealTable: ''
     } as Credentials,
 
     isLoaded: false,
@@ -122,7 +130,11 @@ export const useCredentialsStore = defineStore('credentials', {
       this.credentials = {
         username: '',
         password: '',
-        decryptionPassword: ''
+        decryptionPassword: '',
+        surrealUrl: '',
+        surrealNamespace: '',
+        surrealDatabase: '',
+        surrealTable: ''
       }
       this.encryptedData = ''
       this.isLoaded = false

@@ -21,15 +21,23 @@ class SurrealDBService {
 
   async connect(options?: ConnectOptions): Promise<void> {
     try {
-      const url = import.meta.env.VITE_SURREALDB_URL
-      await this.db.connect(url)
+      // Get credentials from store
+      const credentialsStore = useCredentialsStore();
 
-      const namespace = import.meta.env.VITE_SURREALDB_NAMESPACE
-      const database = import.meta.env.VITE_SURREALDB_DATABASE
+      if (!credentialsStore.isLoaded) {
+        throw new Error('No credentials available. Please set up your credentials first.');
+      }
 
-      await this.db.use({ namespace, database })
+      // Get connection details from credentials store
+      const url = credentialsStore.credentials.surrealUrl;
+      await this.db.connect(url);
 
-      // Get credentials from store if not provided in options
+      const namespace = credentialsStore.credentials.surrealNamespace;
+      const database = credentialsStore.credentials.surrealDatabase;
+
+      await this.db.use({ namespace, database });
+
+      // Get authentication credentials
       let username: string;
       let password: string;
 
@@ -38,13 +46,7 @@ class SurrealDBService {
         username = options.username;
         password = options.password;
       } else {
-        // Try to get credentials from store
-        const credentialsStore = useCredentialsStore();
-
-        if (!credentialsStore.isLoaded) {
-          throw new Error('No credentials available. Please set up your credentials first.');
-        }
-
+        // Use credentials from store
         username = credentialsStore.credentials.username;
         password = credentialsStore.credentials.password;
       }
@@ -73,7 +75,8 @@ class SurrealDBService {
     }
 
     try {
-      const tableName = import.meta.env.VITE_SURREALDB_TABLE
+      const credentialsStore = useCredentialsStore();
+      const tableName = credentialsStore.credentials.surrealTable;
       const encryptedField = import.meta.env.VITE_SURREALDB_ENCRYPTED_FIELD
       const timestampField = import.meta.env.VITE_SURREALDB_TIMESTAMP_FIELD
 
@@ -93,7 +96,8 @@ class SurrealDBService {
     }
 
     try {
-      const tableName = import.meta.env.VITE_SURREALDB_TABLE
+      const credentialsStore = useCredentialsStore();
+      const tableName = credentialsStore.credentials.surrealTable;
       const encryptedField = import.meta.env.VITE_SURREALDB_ENCRYPTED_FIELD
       const deviceField = import.meta.env.VITE_SURREALDB_DEVICE_FIELD
       const timestampField = import.meta.env.VITE_SURREALDB_TIMESTAMP_FIELD
@@ -114,7 +118,8 @@ class SurrealDBService {
     }
 
     try {
-      const tableName = import.meta.env.VITE_SURREALDB_TABLE
+      const credentialsStore = useCredentialsStore();
+      const tableName = credentialsStore.credentials.surrealTable;
       const encryptedField = import.meta.env.VITE_SURREALDB_ENCRYPTED_FIELD
       const timestampField = import.meta.env.VITE_SURREALDB_TIMESTAMP_FIELD
 
@@ -138,7 +143,8 @@ class SurrealDBService {
     }
 
     try {
-      const tableName = import.meta.env.VITE_SURREALDB_TABLE
+      const credentialsStore = useCredentialsStore();
+      const tableName = credentialsStore.credentials.surrealTable;
       const encryptedField = import.meta.env.VITE_SURREALDB_ENCRYPTED_FIELD
       const deviceField = import.meta.env.VITE_SURREALDB_DEVICE_FIELD
       const timestampField = import.meta.env.VITE_SURREALDB_TIMESTAMP_FIELD

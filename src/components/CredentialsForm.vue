@@ -60,6 +60,54 @@
             class="input"
           />
         </div>
+
+        <div class="form-group">
+          <label for="surrealUrl">SurrealDB URL:</label>
+          <input
+            id="surrealUrl"
+            v-model="formData.surrealUrl"
+            type="text"
+            required
+            placeholder="Enter your SurrealDB URL (e.g., wss://example.com/rpc)"
+            class="input"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="surrealNamespace">SurrealDB Namespace:</label>
+          <input
+            id="surrealNamespace"
+            v-model="formData.surrealNamespace"
+            type="text"
+            required
+            placeholder="Enter your SurrealDB namespace"
+            class="input"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="surrealDatabase">SurrealDB Database:</label>
+          <input
+            id="surrealDatabase"
+            v-model="formData.surrealDatabase"
+            type="text"
+            required
+            placeholder="Enter your SurrealDB database"
+            class="input"
+          />
+        </div>
+
+        <div class="form-group">
+          <label for="surrealTable">SurrealDB Table:</label>
+          <input
+            id="surrealTable"
+            v-model="formData.surrealTable"
+            type="text"
+            required
+            placeholder="Enter your SurrealDB table"
+            class="input"
+          />
+        </div>
       </div>
 
       <div class="form-actions">
@@ -115,7 +163,11 @@ const isEditMode = ref(false)
 const formData = ref({
   username: '',
   password: '',
-  decryptionPassword: ''
+  decryptionPassword: '',
+  surrealUrl: '',
+  surrealNamespace: '',
+  surrealDatabase: '',
+  surrealTable: ''
 })
 
 const hasStoredCredentials = computed(() => {
@@ -188,7 +240,11 @@ const handleClearCredentials = () => {
     formData.value = {
       username: '',
       password: '',
-      decryptionPassword: ''
+      decryptionPassword: '',
+      surrealUrl: '',
+      surrealNamespace: '',
+      surrealDatabase: '',
+      surrealTable: ''
     }
     masterPassword.value = ''
     isEditMode.value = false
