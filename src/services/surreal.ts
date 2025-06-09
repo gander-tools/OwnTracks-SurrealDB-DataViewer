@@ -80,7 +80,7 @@ class SurrealDBService {
       const encryptedField = import.meta.env.VITE_SURREALDB_ENCRYPTED_FIELD
       const timestampField = import.meta.env.VITE_SURREALDB_TIMESTAMP_FIELD
 
-      const query = `SELECT * FROM ${tableName} WHERE ${encryptedField} IS NOT NULL ORDER BY ${timestampField} DESC LIMIT 100`
+      const query = `SELECT * FROM ${tableName} WHERE ${encryptedField} IS NOT NULL ORDER BY ${timestampField} DESC LIMIT 1000`
       const result = await this.db.query(query)
 
       return result[0] as OwnTracksData[] || []
@@ -102,7 +102,7 @@ class SurrealDBService {
       const deviceField = import.meta.env.VITE_SURREALDB_DEVICE_FIELD
       const timestampField = import.meta.env.VITE_SURREALDB_TIMESTAMP_FIELD
 
-      const query = `SELECT * FROM ${tableName} WHERE ${deviceField} = $deviceId AND ${encryptedField} IS NOT NULL ORDER BY ${timestampField} DESC LIMIT 100`
+      const query = `SELECT * FROM ${tableName} WHERE ${deviceField} = $deviceId AND ${encryptedField} IS NOT NULL ORDER BY ${timestampField} DESC LIMIT 1000`
       const result = await this.db.query(query, { deviceId })
 
       return result[0] as OwnTracksData[] || []
@@ -163,7 +163,7 @@ class SurrealDBService {
         params.endDate = endDate.toISOString()
       }
 
-      const query = `SELECT * FROM ${tableName} WHERE ${whereConditions.join(' AND ')} ORDER BY ${timestampField} DESC LIMIT 100`
+      const query = `SELECT * FROM ${tableName} WHERE ${whereConditions.join(' AND ')} ORDER BY ${timestampField} DESC LIMIT 1000`
       const result = await this.db.query(query, params)
 
       return result[0] as OwnTracksData[] || []

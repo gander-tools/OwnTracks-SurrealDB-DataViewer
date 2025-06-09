@@ -119,43 +119,14 @@
     </div>
 
     <div v-if="state.data.length > 0" class="data-section">
-      <h3>Encrypted OwnTracks Data ({{ state.data.length }} records)</h3>
-      <div class="data-grid">
-        <div
-          v-for="(item, index) in state.data"
-          :key="item.id || index"
-          class="data-item"
-        >
-          <div class="data-header">
-            <span class="id">ID: {{ item.id || 'N/A' }}</span>
-            <span class="timestamp">{{ formatTimestamp(getTimestampValue(item)) }}</span>
-          </div>
-          <div class="device-id" v-if="getDeviceValue(item)">
-            Device: {{ getDeviceValue(item) }}
-          </div>
-          <div class="encrypted-data">
-            <div v-if="getDecryptedData(item)" class="decrypted-section">
-              <strong>Decrypted Data:</strong>
-              <pre class="json-data">{{ getDecryptedData(item) }}</pre>
-            </div>
-            <div v-else-if="hasDecryptionError(item)" class="decryption-error">
-              <strong>Decryption Error:</strong>
-              <span class="error-message">{{ getDecryptionError(item) }}</span>
-            </div>
-            <div v-else class="raw-encrypted">
-              <strong>Encrypted Data:</strong>
-              <pre class="encrypted-content">{{ getContentValue(item) }}</pre>
-            </div>
-          </div>
-          <div class="metadata" v-if="hasMetadata(item)">
-            <strong>Additional Fields:</strong>
-            <ul>
-              <li v-for="[key, value] in getMetadata(item)" :key="key">
-                <strong>{{ key }}:</strong> {{ value }}
-              </li>
-            </ul>
-          </div>
-        </div>
+      <!-- Map section -->
+      <div v-if="mapData.length > 0" class="map-section">
+        <h3>OwnTracks Location Map ({{ mapData.length }} points)</h3>
+        <OwnTracksMap :decrypted-data="mapData" />
+      </div>
+
+      <div v-else class="no-map-data">
+        <p>No location data available for map display. Please decrypt the data first.</p>
       </div>
     </div>
 
@@ -172,6 +143,7 @@ import type { OwnTracksData } from '../services/surreal'
 import ownTracksCrypto from '../services/crypto'
 import { useCredentialsStore } from '../stores/credentials'
 import CredentialsForm from './CredentialsForm.vue'
+import OwnTracksMap from './OwnTracksMap.vue'
 
 const { state, connect, disconnect, fetchEncryptedData, fetchEncryptedDataByDevice, fetchEncryptedDataByDateRange, fetchEncryptedDataWithFilters, clearData } = useOwnTracks()
 const credentialsStore = useCredentialsStore()
@@ -353,6 +325,35 @@ const handleDecryptData = async () => {
 const clearDecryption = () => {
   decryptionResults.clear()
 }
+
+// Transform decrypted data for the map component
+const mapData = computed(() => {
+  const result: Record<string, any>[] = [];
+
+  // Only include items that have been successfully decrypted
+  state.data.forEach(item => {
+    if (item.id && decryptionResults.has(item.id) && decryptionResults.get(item.id)?.success) {
+      try {
+        // Parse the JSON data
+        const decryptedData = JSON.parse(decryptionResults.get(item.id)?.data || '{}');
+
+        // Add the device ID from the original item if available
+        if (!decryptedData.device && getDeviceValue(item)) {
+          decryptedData.device = getDeviceValue(item);
+        }
+
+        // Add to result if it has lat/lon coordinates
+        if (decryptedData.lat && decryptedData.lon) {
+          result.push(decryptedData);
+        }
+      } catch (error) {
+        console.error('Error parsing decrypted data for map:', error);
+      }
+    }
+  });
+
+  return result;
+});
 </script>
 
 <style scoped>
@@ -625,5 +626,34 @@ const clearDecryption = () => {
   border-radius: 4px;
   margin-bottom: 10px;
   font-size: 14px;
+}
+
+.map-section {
+  margin-bottom: 30px;
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.map-section h3 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #28a745;
+  text-align: center;
+}
+
+.no-map-data {
+  background-color: #f8f9fa;
+  border-radius: 8px;
+  padding: 40px;
+  text-align: center;
+  color: #666;
+  font-style: italic;
+  margin: 20px 0;
+  border: 1px solid #ddd;
 }
 </style>
